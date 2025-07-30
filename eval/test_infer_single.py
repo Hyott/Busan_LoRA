@@ -34,5 +34,5 @@ def run(prompt: str):
     print(json.loads(text))  # 실패 시 예외 발생 → 모델/데이터 확인
 
 if __name__ == "__main__":
-    prompt = build_prompt("2025년 1월 사상구 30,40대 여성 직장")
+    prompt = build_prompt("2025년 1월 논산시 부적면 30,40대 여성 직장인구 알려줘")
     run(prompt)

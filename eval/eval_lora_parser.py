@@ -6,6 +6,23 @@ from transformers import AutoTokenizer, AutoModelForCausalLM
 from peft import PeftModel
 
 BASE_MODEL = "dnotitia/Llama-DNA-1.0-8B-Instruct"
+# 파일 상단/함수들 근처에 유틸 추가
+def _list_norm(x):
+    return sorted(x or [])
+
+def diff_fields(pred:Dict[str,Any], gold:Dict[str,Any])->Dict[str, Any]:
+    """어떤 필드가 다른지 요약."""
+    p = canon(pred); g = canon(gold)
+    diffs = {}
+    if p["base_ym"] != g["base_ym"]:
+        diffs["base_ym"] = {"pred": p["base_ym"], "gold": g["base_ym"]}
+    if p["region_nm"] != g["region_nm"]:
+        diffs["region_nm"] = {"pred": p["region_nm"], "gold": g["region_nm"]}
+    for fld in ["ptrn","gender_cd","age_cd"]:
+        if _list_norm(p[fld]) != _list_norm(g[fld]):
+            diffs[fld] = {"pred": p[fld], "gold": g[fld]}
+    return diffs
+
 
 def detect_device():
     if torch.backends.mps.is_available(): return "mps"
@@ -58,21 +75,23 @@ def as_set(x):
     return {x}
 
 def canon(obj:Dict[str,Any])->Dict[str,Any]:
-    """비교 전 정렬/타입 통일"""
+    """비교 전 정렬/타입 통일 (region_cd 제거 버전)"""
     if not isinstance(obj, dict): return obj
     out={}
     out["base_ym"] = int(obj.get("base_ym")) if obj.get("base_ym") is not None else None
-    for k in ["ptrn","gender_cd","age_cd"]:
-        v = obj.get(k)
-        if isinstance(v,list):
-            v2=[]
-            for t in v:
-                try: v2.append(int(t))
+    # 집합형 필드만 정규화
+    def _norm_list_int(x):
+        if isinstance(x, list):
+            y=[]
+            for t in x:
+                try: y.append(int(t))
                 except: pass
-            out[k]=sorted(set(v2))
-        else:
-            out[k]=None
-    # region_nm 문자열
+            return sorted(set(y))
+        return None
+    out["ptrn"]      = _norm_list_int(obj.get("ptrn"))
+    out["gender_cd"] = _norm_list_int(obj.get("gender_cd"))
+    out["age_cd"]    = _norm_list_int(obj.get("age_cd"))
+    # 문자열 필드
     rn = obj.get("region_nm")
     out["region_nm"] = rn.strip() if isinstance(rn,str) else None
     return out
@@ -91,24 +110,59 @@ def jaccard(a:List[int], b:List[int])->float:
 def field_scores(pred:Dict[str,Any], gold:Dict[str,Any])->Dict[str,float]:
     p = canon(pred); g = canon(gold)
     scores={}
-    scores["base_ym_acc"] = float(p["base_ym"]==g["base_ym"])
+    scores["base_ym_acc"]   = float(p["base_ym"]==g["base_ym"])
     scores["region_nm_acc"] = float(p["region_nm"]==g["region_nm"])
-    # 집합 유사도
+    # 집합 유사도 + 완전일치
     scores["ptrn_jac"]      = jaccard(p["ptrn"], g["ptrn"])
     scores["gender_jac"]    = jaccard(p["gender_cd"], g["gender_cd"])
     scores["age_jac"]       = jaccard(p["age_cd"], g["age_cd"])
-    # 완전일치 비율도 계산
-    scores["ptrn_exact"]    = float(sorted(p["ptrn"] or []) == sorted(g["ptrn"] or []))
-    scores["gender_exact"]  = float(sorted(p["gender_cd"] or []) == sorted(g["gender_cd"] or []))
-    scores["age_exact"]     = float(sorted(p["age_cd"] or []) == sorted(g["age_cd"] or []))
+    scores["ptrn_exact"]    = float((p["ptrn"] or []) == (g["ptrn"] or []))
+    scores["gender_exact"]  = float((p["gender_cd"] or []) == (g["gender_cd"] or []))
+    scores["age_exact"]     = float((p["age_cd"] or []) == (g["age_cd"] or []))
     return scores
+
+from mapping.region_normalizer import normalize_region_nm
+import copy
+
+from mapping.region_normalizer import normalize_region_nm
+from mapping.ptrn_normalizer import normalize_ptrn_to_codes, remap_legacy_codes
+
+def postprocess(pred: dict, raw_text: str) -> dict:
+    pred = pred.copy()
+    pred["ptrn"] = remap_legacy_codes(pred.get("ptrn"))
+    if not pred.get("ptrn"):
+        pred["ptrn"] = normalize_ptrn_to_codes(raw_text)
+
+    # region_nm 표준화 (기존 로직 유지)
+    rn = pred.get("region_nm")
+    if isinstance(rn, str):
+        std = normalize_region_nm(rn) or normalize_region_nm(raw_text) or rn.strip()
+        pred["region_nm"] = std
+
+    # ptrn 보정
+    codes = pred.get("ptrn")
+    # 1) 레거시 코드 리매핑
+    codes = remap_legacy_codes(codes)
+    # 2) 비어있으면 텍스트에서 추정
+    if not codes:
+        codes = normalize_ptrn_to_codes(raw_text)   # 생활인구 또는 미언급이면 [0,1,2]
+    pred["ptrn"] = codes
+
+    return pred
+
 
 def evaluate(model, tok, eval_rows:List[Dict[str,Any]], device:str, max_new_tokens:int=256, limit:int=None, dump_errors:str=None):
     n = len(eval_rows) if limit is None else min(limit, len(eval_rows))
-    ok_parse=0; em=0
-    # 누적
-    agg = {k:0.0 for k in ["base_ym_acc","region_nm_acc","ptrn_jac","gender_jac","age_jac","ptrn_exact","gender_exact","age_exact"]}
-    errors=[]
+    ok_parse = 0
+
+    keys = ["base_ym_acc","region_nm_acc","ptrn_jac","gender_jac","age_jac","ptrn_exact","gender_exact","age_exact"]
+    agg_raw  = {k:0.0 for k in keys}
+    agg_post = {k:0.0 for k in keys}
+    em_raw = 0
+    em_post = 0
+
+    logs = []   # ✅ 여기에 모든 로그 누적 (parse_fail, mismatch_raw, mismatch_post)
+
     for i in range(n):
         r = eval_rows[i]
         prompt = build_prompt(r["input"])
@@ -124,33 +178,70 @@ def evaluate(model, tok, eval_rows:List[Dict[str,Any]], device:str, max_new_toke
         text = tok.decode(out[0][inputs["input_ids"].shape[1]:], skip_special_tokens=True)
         cand = extract_json(text)
         pred, err = try_parse_json(cand)
-        if pred is not None:
-            ok_parse += 1
-            if exact_match(pred, r["output"]): em += 1
-            fs = field_scores(pred, r["output"])
-            for k,v in fs.items(): agg[k]+=v
-        else:
-            # 파싱 실패 샘플 저장
-            errors.append({
+
+        if pred is None:
+            logs.append({
+                "type": "parse_fail",
                 "input": r["input"],
                 "pred_raw": text,
                 "gold": r["output"],
                 "error": str(err),
             })
+            continue
 
-    # 평균
-    res = {k:(v/n if n>0 else 0.0) for k,v in agg.items()}
-    res["json_parse_rate"] = ok_parse/n if n>0 else 0.0
-    res["exact_match"] = em/n if n>0 else 0.0
+        ok_parse += 1
+
+        # ----- RAW -----
+        diffs_raw = diff_fields(pred, r["output"])
+        if len(diffs_raw) == 0:
+            em_raw += 1
+        else:
+            logs.append({
+                "type": "mismatch_raw",
+                "input": r["input"],
+                "pred": pred,
+                "gold": r["output"],
+                "diffs": diffs_raw,
+            })
+        fs_raw = field_scores(pred, r["output"])
+        for k in keys: agg_raw[k] += fs_raw[k]
+
+        # ----- POSTPROCESSED -----
+        pred_pp = postprocess(pred, r["input"])
+        diffs_post = diff_fields(pred_pp, r["output"])
+        if len(diffs_post) == 0:
+            em_post += 1
+        else:
+            logs.append({
+                "type": "mismatch_post",
+                "input": r["input"],
+                "pred_post": pred_pp,
+                "gold": r["output"],
+                "diffs": diffs_post,
+            })
+        fs_post = field_scores(pred_pp, r["output"])
+        for k in keys: agg_post[k] += fs_post[k]
+
+    def _avg(d): return {k:(v/n if n>0 else 0.0) for k,v in d.items()}
+    res = {}
     res["count"] = n
+    res["json_parse_rate"] = ok_parse/n if n>0 else 0.0
+    res.update({f"{k}_raw":v for k,v in _avg(agg_raw).items()})
+    res.update({f"{k}_post":v for k,v in _avg(agg_post).items()})
+    res["exact_match_raw"]  = em_raw/n  if n>0 else 0.0
+    res["exact_match_post"] = em_post/n if n>0 else 0.0
 
     if dump_errors:
+        import os, json
         os.makedirs(os.path.dirname(dump_errors) or ".", exist_ok=True)
         with open(dump_errors, "w", encoding="utf-8") as f:
-            for e in errors[:200]:  # 너무 크지 않게 상위 200개만
+            for e in logs:   # ✅ 파싱 실패 + 불일치 모두 기록
                 f.write(json.dumps(e, ensure_ascii=False) + "\n")
 
     return res
+
+
+
 
 def main():
     ap = argparse.ArgumentParser()
@@ -185,13 +276,18 @@ def main():
     res = evaluate(model, tok, eval_rows, device, max_new_tokens=args.max_new_tokens, limit=args.limit, dump_errors=args.dump_errors)
 
     print("\n==== Evaluation (eval set) ====")
-    for k in [
-        "count", "json_parse_rate", "exact_match",
-        "base_ym_acc", "region_nm_acc",
-        "ptrn_jac", "gender_jac", "age_jac",
-        "ptrn_exact", "gender_exact", "age_exact",
-    ]:
-        print(f"{k:16s} : {res[k]:.4f}" if isinstance(res[k], float) else f"{k:16s} : {res[k]}")
+    print(f"count               : {res['count']}")
+    print(f"json_parse_rate     : {res['json_parse_rate']:.4f}")
+
+    # RAW
+    print("\n-- RAW --")
+    for k in ["exact_match_raw","base_ym_acc_raw","region_nm_acc_raw","ptrn_jac_raw","gender_jac_raw","age_jac_raw","ptrn_exact_raw","gender_exact_raw","age_exact_raw"]:
+        print(f"{k:20s}: {res[k]:.4f}")
+
+    # POST
+    print("\n-- POSTPROCESSED --")
+    for k in ["exact_match_post","base_ym_acc_post","region_nm_acc_post","ptrn_jac_post","gender_jac_post","age_jac_post","ptrn_exact_post","gender_exact_post","age_exact_post"]:
+        print(f"{k:20s}: {res[k]:.4f}")
 
     print(f"\n[errors] dumped to: {args.dump_errors}")
 

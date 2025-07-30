@@ -1,0 +1,16 @@
+{"input":"25년 5월 부산시 생활인구 보여줘","output":{"base_ym":202505,"region_cd":[26],"region_nm":"부산광역시","ptrn":[0,1,2],"gender_cd":[0,1],"age_cd": [0,10,20,30,40,50,60,70,80]}}
+{"input":"25년 2월 부산시 중구 20,30대 남자 거주인구 보여줘","output":{"base_ym":202502,"region_cd":[26110],"region_nm":"부산광역시 중구","ptrn":[0],"gender_cd":[0],"age_cd":[20,30]}}
+{"input":"24년 6월 부산시 서구 서대신제1동 여성 직장인구 보여줘","output":{"base_ym":202406,"region_cd":[26140540],"region_nm":"부산광역시 서구 서대신제1동","ptrn":[1],"gender_cd":[1],"age_cd":[0,10,20,30,40,50,60,70,80]}}
+{"input":"24년 9월 부산시 동구 여자 80세 이상 방문인구 알려줘","output":{"base_ym":202409,"region_cd":[26170],"region_nm":"부산광역시 동구","ptrn":[2],"gender_cd":[1],"age_cd":[80]}}
+{"input":"24년 1월 부산시 영도구 남성 생활인구 알려줘","output":{"base_ym":202401,"region_cd":[26200],"region_nm":"부산광역시 영도구","ptrn":[0,1,2],"gender_cd":[0],"age_cd":[0,10,20,30,40,50,60,70,80]}}
+{"input":"25년 3월 부산시 부산진구 거주 데이터 알려줘","output":{"base_ym":202503,"region_cd":[26230],"region_nm":"부산광역시 부산진구","ptrn":[0],"gender_cd":[0,1],"age_cd":[0,10,20,30,40,50,60,70,80]}}
+{"input":"25년 4월 동래구 직장 데이터 보여줘","output":{"base_ym":202504,"region_cd":[26260],"region_nm":"부산광역시 동래구","ptrn":[1],"gender_cd":[0,1],"age_cd":[0,10,20,30,40,50,60,70,80]}}
+{"input":"25년 1월 남구 거주, 직장 차트 보여줘","output":{"base_ym":202501,"region_cd":[26290],"region_nm":"부산광역시 남구","ptrn":[0,1],"gender_cd":[0,1],"age_cd":[0,10,20,30,40,50,60,70,80]}}
+{"input":"24년 12월 북구 40,50대 거주인구 보여줘","output":{"base_ym":202412,"region_cd":[26320],"region_nm":"부산광역시 북구","ptrn":[0],"gender_cd":[0,1],"age_cd":[40,50]}}
+{"input":"2024년 8월 해운대구 20,30대 방문 데이터 보여줘","output":{"base_ym":202408,"region_cd":[26350],"region_nm":"부산광역시 해운대구","ptrn":[2],"gender_cd":[0,1],"age_cd":[20,30]}}
+{"input":"2024년 7월 사하구 데이터 보여줘","output":{"base_ym":202407,"region_cd":[26380],"region_nm":"부산광역시 사하구","ptrn":[0,1,2],"gender_cd":[0,1],"age_cd":[0,10,20,30,40,50,60,70,80]}}
+{"input":"2024년 10월 금정구 남산동 인구 알려줘","output":{"base_ym":202410,"region_cd":[26410670],"region_nm":"부산광역시 금정구 남산동","ptrn":[0,1,2],"gender_cd":[0,1],"age_cd":[0,10,20,30,40,50,60,70,80]}}
+{"input":"2024년 11월 연제구 10대 거주 차트 보여줘","output":{"base_ym":202411,"region_cd":[26],"region_nm":"부산광역시 연제구","ptrn":[0],"gender_cd":[0,1],"age_cd":[10]}}
+{"input":"2024년 12월 수영구 광안제4동 남자 50세 생활인구 알려줘","output":{"base_ym":202412,"region_cd":[26500790],"region_nm":"부산광역시 수영구 광안제4동","ptrn":[0,1,2],"gender_cd":[0],"age_cd":[50]}}
+{"input":"2025년 1월 사상구 30,40대 여성 직장","output":{"base_ym":202501,"region_cd":[26530],"region_nm":"부산광역시 사상구","ptrn":[1],"gender_cd":[1],"age_cd":[30,40]}}
+{"input":"2025년 2월 기장군 방문","output":{"base_ym":202502,"region_cd":[26710],"region_nm":"부산광역시 기장군","ptrn":[2],"gender_cd":[0,1],"age_cd":[0,10,20,30,40,50,60,70,80]}}
