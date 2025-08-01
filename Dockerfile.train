@@ -1,0 +1,25 @@
+FROM pytorch/pytorch:2.4.1-cuda12.4-cudnn9-runtime
+
+ENV DEBIAN_FRONTEND=noninteractive \
+    HF_HOME=/hf_cache \
+    TRANSFORMERS_CACHE=/hf_cache \
+    PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1
+
+WORKDIR /app
+
+# 시스템 유틸 (선택)
+RUN apt-get update && apt-get install -y git git-lfs && git lfs install && rm -rf /var/lib/apt/lists/*
+
+# 파이썬 라이브러리
+COPY requirements-server.txt /app/requirements-server.txt
+RUN pip install --upgrade pip && pip install -r requirements-server.txt
+
+# 프로젝트 코드 복사
+COPY . /app
+
+# 가급적 런타임 인자/볼륨로 주입 (토큰은 이미지에 하드코딩 X)
+# ENV HUGGINGFACE_HUB_TOKEN=...
+
+# 기본 엔트리포인트는 쉘; compose/command에서 학습 커맨드를 넘깁니다.
+ENTRYPOINT ["/bin/bash", "-lc"]

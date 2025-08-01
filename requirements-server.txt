@@ -1,0 +1,27 @@
+# ---- Core (CUDA) ----
+--extra-index-url https://download.pytorch.org/whl/cu124
+torch==2.4.1+cu124
+transformers==4.54.0
+accelerate>=1.0,<2
+peft==0.16.0
+safetensors>=0.4.3
+
+# ---- Tokenization / text ----
+sentencepiece>=0.1.99
+tokenizers>=0.19.1
+regex>=2024.5.15
+packaging>=23.2
+
+# ---- Data / utils ----
+numpy>=1.26
+pandas>=2.2
+openpyxl>=3.1.2
+tqdm>=4.66
+psutil>=5.9
+uvicorn[standard]>=0.30
+fastapi>=0.111
+
+# ---- OPTIONAL (데이터/평가)
+datasets>=2.20
+evaluate>=0.4.2
+scikit-learn>=1.4
